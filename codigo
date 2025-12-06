@@ -1,0 +1,91 @@
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/wifi-module.h"
+#include "ns3/mobility-module.h"
+#include "ns3/applications-module.h"
+
+using namespace ns3;
+
+void TxCallback(std::string context, Ptr<const Packet> p)
+{
+    std::cout << "[TX] " << context << " | " << p->GetSize() << " bytes\n";
+}
+
+void RxCallback(std::string context, Ptr<const Packet> p)
+{
+    std::cout << "[RX] " << context << " | " << p->GetSize() << " bytes\n";
+}
+
+int main(int argc, char *argv[])
+{
+    Time::SetResolution(Time::NS);
+
+    NodeContainer nodes;
+    nodes.Create(2);
+
+    // Canal e PHY
+    YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
+    YansWifiPhyHelper phy;
+    phy.SetChannel(channel.Create());
+
+    // Wifi
+    WifiHelper wifi;
+    wifi.SetStandard(WIFI_STANDARD_80211n);
+
+    WifiMacHelper mac;
+    Ssid ssid = Ssid("IoT");
+
+    mac.SetType("ns3::StaWifiMac",
+                "Ssid", SsidValue(ssid),
+                "ActiveProbing", BooleanValue(false));
+    NetDeviceContainer staDev = wifi.Install(phy, mac, nodes.Get(0));
+
+    mac.SetType("ns3::ApWifiMac",
+                "Ssid", SsidValue(ssid));
+    NetDeviceContainer apDev = wifi.Install(phy, mac, nodes.Get(1));
+
+    // Mobilidade
+    MobilityHelper mobility;
+    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    mobility.Install(nodes);
+
+    // Internet
+    InternetStackHelper stack;
+    stack.Install(nodes);
+
+    Ipv4AddressHelper address;
+    address.SetBase("10.1.1.0", "255.255.255.0");
+    Ipv4InterfaceContainer ifc = address.Assign(NetDeviceContainer(staDev, apDev));
+
+    // Callbacks com contexto (API nova, funciona!)
+    Config::Connect("/NodeList//DeviceList//Mac/MacTx",
+                    MakeCallback(&TxCallback));
+
+    Config::Connect("/NodeList//DeviceList//Mac/MacRx",
+                    MakeCallback(&RxCallback));
+
+    // Aplicações
+    uint16_t port = 9999;
+
+    UdpServerHelper server(port);
+    ApplicationContainer serverApp = server.Install(nodes.Get(1));
+    serverApp.Start(Seconds(1));
+    serverApp.Stop(Seconds(10));
+
+    UdpClientHelper client(ifc.GetAddress(1), port);
+    client.SetAttribute("MaxPackets", UintegerValue(100));
+    client.SetAttribute("Interval", TimeValue(MilliSeconds(500)));
+    client.SetAttribute("PacketSize", UintegerValue(200));
+
+    ApplicationContainer clientApp = client.Install(nodes.Get(0));
+    clientApp.Start(Seconds(2));
+    clientApp.Stop(Seconds(10));
+
+    std::cout << "Iniciando simulação...\n";
+    Simulator::Run();
+    std::cout << "Simulação finalizada!\n";
+
+    Simulator::Destroy();
+    return 0;
+}
