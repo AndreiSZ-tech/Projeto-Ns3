@@ -31,3 +31,12 @@ O nó 1 recebeu corretamente o mesmo pacote
 ✔ As mensagens variam entre 36 bytes e 236 bytes
 ✔ O canal está funcionando perfeitamente, sem perdas
 ✔ Você habilitou os trace sources do MAC, então só vê TX/RX
+
+# Resultado 
+![g](https://github.com/user-attachments/assets/4c204761-c215-4e83-be34-7984d2c57c86)
+
+# Erro
+![erro](https://github.com/user-attachments/assets/34d8d9d6-958f-4f04-96e4-6dbd3e8f38ea)
+
+
+
